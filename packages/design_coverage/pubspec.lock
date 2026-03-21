@@ -52,9 +52,11 @@ packages:
   design_coverage_annotation:
     dependency: "direct main"
     description:
-      path: "../design_coverage_annotation"
-      relative: true
-    source: path
+      path: "packages/design_coverage_annotation"
+      ref: "0.1.0"
+      resolved-ref: e9a786167cd80361090852c956bccf98e6ed33f6
+      url: "https://github.com/valeriinov/design_coverage.git"
+    source: git
     version: "0.1.0"
   file:
     dependency: transitive

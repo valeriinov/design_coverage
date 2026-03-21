@@ -11,4 +11,7 @@ dependencies:
   analyzer: ^8.4.0
   path: ^1.9.1
   design_coverage_annotation:
-    path: ../design_coverage_annotation
+    git:
+      url: https://github.com/valeriinov/design_coverage.git
+      path: packages/design_coverage_annotation
+      ref: 0.1.0
