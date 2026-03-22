@@ -27,14 +27,14 @@ class EntryParser {
     required Directory projectRoot,
     required AnalysisContextCollection collection,
   }) async {
-    final absoluteFilePath = file.absolute.path;
+    final canonicalFilePath = file.resolveSymbolicLinksSync();
     final sourcePath = path.relative(
-      absoluteFilePath,
-      from: projectRoot.absolute.path,
+      canonicalFilePath,
+      from: projectRoot.resolveSymbolicLinksSync(),
     );
 
-    final session = collection.contextFor(absoluteFilePath).currentSession;
-    final result = await session.getResolvedUnit(absoluteFilePath);
+    final session = collection.contextFor(canonicalFilePath).currentSession;
+    final result = await session.getResolvedUnit(canonicalFilePath);
 
     if (result is! ResolvedUnitResult) {
       return FileScanResult(
