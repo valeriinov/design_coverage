@@ -2,24 +2,27 @@ import 'dart:io';
 
 import 'package:design_coverage/design_coverage.dart';
 
-void main(List<String> arguments) {
+Future<void> main(List<String> arguments) async {
   final options = _CommandOptions.parse(arguments);
   final generator = DesignCoverageGenerator();
 
   if (options.isCheckMode) {
-    _runCheck(generator, options);
+    await _runCheck(generator, options);
     return;
   }
 
-  _runGeneration(generator, options);
+  await _runGeneration(generator, options);
 }
 
-void _runCheck(DesignCoverageGenerator generator, _CommandOptions options) {
+Future<void> _runCheck(
+  DesignCoverageGenerator generator,
+  _CommandOptions options,
+) async {
   final projectRoot = Directory.current;
   bool isUpToDate = false;
 
   try {
-    isUpToDate = generator.isUpToDate(
+    isUpToDate = await generator.isUpToDate(
       projectRoot,
       sourceDirectoryPath: options.sourceDirectoryPath,
       outputFilePath: options.outputFilePath,
@@ -40,14 +43,14 @@ void _runCheck(DesignCoverageGenerator generator, _CommandOptions options) {
   );
 }
 
-void _runGeneration(
+Future<void> _runGeneration(
   DesignCoverageGenerator generator,
   _CommandOptions options,
-) {
+) async {
   final projectRoot = Directory.current;
 
   try {
-    generator.write(
+    await generator.write(
       projectRoot,
       sourceDirectoryPath: options.sourceDirectoryPath,
       outputFilePath: options.outputFilePath,
