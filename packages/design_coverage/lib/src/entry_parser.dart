@@ -86,9 +86,9 @@ class EntryParser {
     final location = _buildLocation(
       sourcePath: sourcePath,
       lineInfo: lineInfo,
-      offset: declaration.name.offset,
+      offset: declaration.namePart.typeName.offset,
     );
-    final className = declaration.name.lexeme;
+    final className = declaration.namePart.typeName.lexeme;
 
     if (_isPrivateClass(className)) {
       return ParsedEntry(
