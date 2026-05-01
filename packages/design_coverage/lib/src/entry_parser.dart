@@ -1,6 +1,7 @@
 import 'dart:io';
 
-import 'package:analyzer/dart/analysis/utilities.dart';
+import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
+import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/source/line_info.dart';
 import 'package:design_coverage/src/annotation_reader.dart';
@@ -21,39 +22,48 @@ class EntryParser {
   EntryParser({AnnotationReader? reader})
     : _reader = reader ?? const AnnotationReader();
 
-  FileScanResult collectFileEntries({
+  Future<FileScanResult> collectFileEntries({
     required File file,
     required Directory projectRoot,
-  }) {
+    required AnalysisContextCollection collection,
+  }) async {
+    final canonicalFilePath = file.resolveSymbolicLinksSync();
+    final sourcePath = path.relative(
+      canonicalFilePath,
+      from: projectRoot.resolveSymbolicLinksSync(),
+    );
+
+    final session = collection.contextFor(canonicalFilePath).currentSession;
+    final result = await session.getResolvedUnit(canonicalFilePath);
+
+    if (result is! ResolvedUnitResult) {
+      return FileScanResult(
+        entries: [],
+        errors: ['$sourcePath: failed to resolve file.'],
+      );
+    }
+
     final entries = <DesignCoverageEntry>[];
     final errors = <String>[];
 
-    final sourcePath = path.relative(file.path, from: projectRoot.path);
-    final content = file.readAsStringSync();
-    final parseResult = parseString(
-      path: file.path,
-      content: content,
-      throwIfDiagnostics: false,
-    );
-
     for (final declaration
-        in parseResult.unit.declarations.whereType<ClassDeclaration>()) {
+        in result.unit.declarations.whereType<ClassDeclaration>()) {
       final annotation = _findDesignComponentAnnotation(declaration.metadata);
 
       if (annotation == null) {
         continue;
       }
 
-      final result = _parseEntry(
+      final entryResult = _parseEntry(
         annotation: annotation,
         declaration: declaration,
         sourcePath: sourcePath,
-        lineInfo: parseResult.lineInfo,
+        lineInfo: result.lineInfo,
       );
 
-      errors.addAll(result.errors);
+      errors.addAll(entryResult.errors);
 
-      final entry = result.entry;
+      final entry = entryResult.entry;
 
       if (entry != null) {
         entries.add(entry);
@@ -120,29 +130,29 @@ class EntryParser {
       );
     }
 
-    final namedResult = _reader.readNamedArguments(
-      annotation: annotation,
-      location: location,
-    );
-    final namedArguments = namedResult.value;
+    final constant = annotation.elementAnnotation?.computeConstantValue();
 
-    if (namedArguments == null) {
-      final error = namedResult.error;
-      return ParsedEntry(entry: null, errors: [if (error != null) error]);
+    if (constant == null) {
+      return ParsedEntry(
+        entry: null,
+        errors: [
+          '$location: `@DesignComponent` could not be evaluated as a constant.',
+        ],
+      );
     }
 
-    final categoryResult = _reader.readRequiredStringArgument(
-      argumentName: 'category',
-      arguments: namedArguments,
+    final categoryResult = _reader.readRequiredString(
+      constant: constant,
+      fieldName: 'category',
       location: location,
     );
     final designUrlResult = _reader.readRequiredDesignUrl(
-      arguments: namedArguments,
+      constant: constant,
       location: location,
     );
-    final nameResult = _reader.readRequiredStringArgument(
-      argumentName: 'name',
-      arguments: namedArguments,
+    final nameResult = _reader.readRequiredString(
+      constant: constant,
+      fieldName: 'name',
       location: location,
     );
 
@@ -163,16 +173,11 @@ class EntryParser {
       return ParsedEntry(entry: null, errors: fieldErrors);
     }
 
-    final descriptionResult = _reader.readOptionalStringArgument(
-      argumentName: 'description',
-      arguments: namedArguments,
+    final descriptionResult = _reader.readOptionalString(
+      constant: constant,
+      fieldName: 'description',
       location: location,
     );
-    final descriptionError = descriptionResult.error;
-
-    if (descriptionError != null) {
-      return ParsedEntry(entry: null, errors: [descriptionError]);
-    }
 
     return ParsedEntry(
       entry: DesignCoverageEntry(

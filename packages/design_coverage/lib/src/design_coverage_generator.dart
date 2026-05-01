@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:design_coverage/src/design_coverage_entry.dart';
 import 'package:design_coverage/src/design_coverage_markdown_renderer.dart';
 import 'package:design_coverage/src/entry_parser.dart';
@@ -14,6 +15,7 @@ class DesignCoverageGenerator {
   static const Set<String> _generatedFileSuffixes = {
     '.freezed.dart',
     '.g.dart',
+    '.gen.dart',
     '.gr.dart',
     '.names.dart',
     '.tailor.dart',
@@ -28,11 +30,11 @@ class DesignCoverageGenerator {
   }) : _renderer = renderer ?? const DesignCoverageMarkdownRenderer(),
        _parser = parser ?? EntryParser();
 
-  bool isUpToDate(
+  Future<bool> isUpToDate(
     Directory projectRoot, {
     String sourceDirectoryPath = defaultSourceDirectoryPath,
     String outputFilePath = defaultOutputFilePath,
-  }) {
+  }) async {
     final outputFile = _resolveOutputFile(
       projectRoot,
       outputFilePath: outputFilePath,
@@ -43,7 +45,7 @@ class DesignCoverageGenerator {
     }
 
     final currentContent = outputFile.readAsStringSync();
-    final expectedContent = generate(
+    final expectedContent = await generate(
       projectRoot,
       sourceDirectoryPath: sourceDirectoryPath,
     );
@@ -51,11 +53,11 @@ class DesignCoverageGenerator {
     return currentContent == expectedContent;
   }
 
-  String generate(
+  Future<String> generate(
     Directory projectRoot, {
     String sourceDirectoryPath = defaultSourceDirectoryPath,
-  }) {
-    final entries = _collectEntries(
+  }) async {
+    final entries = await _collectEntries(
       projectRoot,
       sourceDirectoryPath: sourceDirectoryPath,
     );
@@ -63,12 +65,12 @@ class DesignCoverageGenerator {
     return _renderer.render(entries);
   }
 
-  void write(
+  Future<void> write(
     Directory projectRoot, {
     String sourceDirectoryPath = defaultSourceDirectoryPath,
     String outputFilePath = defaultOutputFilePath,
-  }) {
-    final content = generate(
+  }) async {
+    final content = await generate(
       projectRoot,
       sourceDirectoryPath: sourceDirectoryPath,
     );
@@ -81,20 +83,25 @@ class DesignCoverageGenerator {
     outputFile.writeAsStringSync(content);
   }
 
-  List<DesignCoverageEntry> _collectEntries(
+  Future<List<DesignCoverageEntry>> _collectEntries(
     Directory projectRoot, {
     required String sourceDirectoryPath,
-  }) {
+  }) async {
     final entries = <DesignCoverageEntry>[];
     final errors = <String>[];
+
+    final collection = AnalysisContextCollection(
+      includedPaths: [projectRoot.resolveSymbolicLinksSync()],
+    );
 
     for (final file in _findSourceFiles(
       projectRoot,
       sourceDirectoryPath: sourceDirectoryPath,
     )) {
-      final result = _parser.collectFileEntries(
+      final result = await _parser.collectFileEntries(
         file: file,
         projectRoot: projectRoot,
+        collection: collection,
       );
 
       entries.addAll(result.entries);
