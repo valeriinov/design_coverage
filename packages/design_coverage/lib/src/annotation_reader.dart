@@ -1,43 +1,16 @@
-import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/constant/value.dart';
 
-/// Extracts typed argument values from `@DesignComponent` annotation AST nodes.
+/// Extracts typed argument values from `@DesignComponent` annotation values.
 class AnnotationReader {
   const AnnotationReader();
 
-  ReadResult<Map<String, Expression>> readNamedArguments({
-    required Annotation annotation,
-    required String location,
-  }) {
-    final arguments = annotation.arguments?.arguments;
-
-    if (arguments == null || arguments.isEmpty) {
-      return ReadResult(
-        error: '$location: `@DesignComponent` must use named arguments.',
-      );
-    }
-
-    final namedArguments = <String, Expression>{};
-
-    for (final argument in arguments) {
-      if (argument is! NamedExpression) {
-        return ReadResult(
-          error: '$location: `@DesignComponent` only supports named arguments.',
-        );
-      }
-
-      namedArguments[argument.name.label.name] = argument.expression;
-    }
-
-    return ReadResult(value: namedArguments);
-  }
-
   ReadResult<String> readRequiredDesignUrl({
-    required Map<String, Expression> arguments,
+    required DartObject annotationValue,
     required String location,
   }) {
     final strResult = readRequiredStringArgument(
       argumentName: 'designUrl',
-      arguments: arguments,
+      annotationValue: annotationValue,
       location: location,
     );
 
@@ -61,12 +34,12 @@ class AnnotationReader {
 
   ReadResult<String> readRequiredStringArgument({
     required String argumentName,
-    required Map<String, Expression> arguments,
+    required DartObject annotationValue,
     required String location,
   }) {
     final optResult = readOptionalStringArgument(
       argumentName: argumentName,
-      arguments: arguments,
+      annotationValue: annotationValue,
       location: location,
     );
 
@@ -89,24 +62,24 @@ class AnnotationReader {
 
   ReadResult<String> readOptionalStringArgument({
     required String argumentName,
-    required Map<String, Expression> arguments,
+    required DartObject annotationValue,
     required String location,
   }) {
-    final expression = arguments[argumentName];
+    final fieldValue = annotationValue.getField(argumentName);
 
-    if (expression == null || expression is NullLiteral) {
+    if (fieldValue == null || fieldValue.isNull) {
       return const ReadResult();
     }
 
-    if (expression is! StringLiteral) {
+    final value = fieldValue.toStringValue()?.trim();
+
+    if (value == null) {
       return ReadResult(
-        error: '$location: `$argumentName` must be a string literal.',
+        error: '$location: `$argumentName` must resolve to a string.',
       );
     }
 
-    final value = expression.stringValue?.trim();
-
-    if (value == null || value.isEmpty) {
+    if (value.isEmpty) {
       return const ReadResult();
     }
 

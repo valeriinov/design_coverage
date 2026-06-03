@@ -1,6 +1,7 @@
 import 'dart:io';
 
-import 'package:analyzer/dart/analysis/utilities.dart';
+import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
+import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/source/line_info.dart';
 import 'package:design_coverage/src/annotation_reader.dart';
@@ -10,6 +11,8 @@ import 'package:path/path.dart' as path;
 /// Scans Dart source files and extracts [DesignCoverageEntry] objects
 /// from classes annotated with `@DesignComponent`.
 class EntryParser {
+  static const String _annotationName = 'DesignComponent';
+
   static const Set<String> _supportedWidgetBaseTypes = {
     'StatelessWidget',
     'StatefulWidget',
@@ -21,23 +24,48 @@ class EntryParser {
   EntryParser({AnnotationReader? reader})
     : _reader = reader ?? const AnnotationReader();
 
-  FileScanResult collectFileEntries({
+  Future<FileScanResult> collectFileEntries({
     required File file,
     required Directory projectRoot,
+    required AnalysisContextCollection analysisContextCollection,
+  }) async {
+    if (!_mayContainAnnotation(file)) {
+      return FileScanResult(entries: [], errors: []);
+    }
+
+    final sourcePath = path.relative(file.path, from: projectRoot.path);
+    final filePath = path.normalize(file.absolute.path);
+    final result = await analysisContextCollection
+        .contextFor(filePath)
+        .currentSession
+        .getResolvedUnit(filePath);
+
+    if (result is! ResolvedUnitResult || !result.exists) {
+      return FileScanResult(
+        entries: [],
+        errors: ['$sourcePath: Could not resolve Dart source file.'],
+      );
+    }
+
+    return _collectResolvedUnitEntries(
+      sourcePath: sourcePath,
+      resolvedUnitResult: result,
+    );
+  }
+
+  bool _mayContainAnnotation(File file) {
+    return file.readAsStringSync().contains(_annotationName);
+  }
+
+  FileScanResult _collectResolvedUnitEntries({
+    required String sourcePath,
+    required ResolvedUnitResult resolvedUnitResult,
   }) {
     final entries = <DesignCoverageEntry>[];
     final errors = <String>[];
 
-    final sourcePath = path.relative(file.path, from: projectRoot.path);
-    final content = file.readAsStringSync();
-    final parseResult = parseString(
-      path: file.path,
-      content: content,
-      throwIfDiagnostics: false,
-    );
-
     for (final declaration
-        in parseResult.unit.declarations.whereType<ClassDeclaration>()) {
+        in resolvedUnitResult.unit.declarations.whereType<ClassDeclaration>()) {
       final annotation = _findDesignComponentAnnotation(declaration.metadata);
 
       if (annotation == null) {
@@ -48,7 +76,7 @@ class EntryParser {
         annotation: annotation,
         declaration: declaration,
         sourcePath: sourcePath,
-        lineInfo: parseResult.lineInfo,
+        lineInfo: resolvedUnitResult.lineInfo,
       );
 
       errors.addAll(result.errors);
@@ -69,7 +97,7 @@ class EntryParser {
         annotation.name.toSource(),
       );
 
-      if (annotationName == 'DesignComponent') {
+      if (annotationName == _annotationName) {
         return annotation;
       }
     }
@@ -120,29 +148,28 @@ class EntryParser {
       );
     }
 
-    final namedResult = _reader.readNamedArguments(
-      annotation: annotation,
-      location: location,
-    );
-    final namedArguments = namedResult.value;
+    final annotationValue = annotation.elementAnnotation
+        ?.computeConstantValue();
 
-    if (namedArguments == null) {
-      final error = namedResult.error;
-      return ParsedEntry(entry: null, errors: [if (error != null) error]);
+    if (annotationValue == null) {
+      return ParsedEntry(
+        entry: null,
+        errors: ['$location: `@DesignComponent` must be a valid constant.'],
+      );
     }
 
     final categoryResult = _reader.readRequiredStringArgument(
       argumentName: 'category',
-      arguments: namedArguments,
+      annotationValue: annotationValue,
       location: location,
     );
     final designUrlResult = _reader.readRequiredDesignUrl(
-      arguments: namedArguments,
+      annotationValue: annotationValue,
       location: location,
     );
     final nameResult = _reader.readRequiredStringArgument(
       argumentName: 'name',
-      arguments: namedArguments,
+      annotationValue: annotationValue,
       location: location,
     );
 
@@ -165,7 +192,7 @@ class EntryParser {
 
     final descriptionResult = _reader.readOptionalStringArgument(
       argumentName: 'description',
-      arguments: namedArguments,
+      annotationValue: annotationValue,
       location: location,
     );
     final descriptionError = descriptionResult.error;
