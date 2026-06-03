@@ -33,12 +33,15 @@ class EntryParser {
       return FileScanResult(entries: [], errors: []);
     }
 
-    final sourcePath = path.relative(file.path, from: projectRoot.path);
-    final filePath = path.normalize(file.absolute.path);
+    final canonicalFilePath = file.resolveSymbolicLinksSync();
+    final sourcePath = path.relative(
+      canonicalFilePath,
+      from: projectRoot.resolveSymbolicLinksSync(),
+    );
     final result = await analysisContextCollection
-        .contextFor(filePath)
+        .contextFor(canonicalFilePath)
         .currentSession
-        .getResolvedUnit(filePath);
+        .getResolvedUnit(canonicalFilePath);
 
     if (result is! ResolvedUnitResult || !result.exists) {
       return FileScanResult(
@@ -148,28 +151,27 @@ class EntryParser {
       );
     }
 
-    final annotationValue = annotation.elementAnnotation
-        ?.computeConstantValue();
+    final constant = annotation.elementAnnotation?.computeConstantValue();
 
-    if (annotationValue == null) {
+    if (constant == null) {
       return ParsedEntry(
         entry: null,
         errors: ['$location: `@DesignComponent` must be a valid constant.'],
       );
     }
 
-    final categoryResult = _reader.readRequiredStringArgument(
-      argumentName: 'category',
-      annotationValue: annotationValue,
+    final categoryResult = _reader.readRequiredString(
+      constant: constant,
+      fieldName: 'category',
       location: location,
     );
     final designUrlResult = _reader.readRequiredDesignUrl(
-      annotationValue: annotationValue,
+      constant: constant,
       location: location,
     );
-    final nameResult = _reader.readRequiredStringArgument(
-      argumentName: 'name',
-      annotationValue: annotationValue,
+    final nameResult = _reader.readRequiredString(
+      constant: constant,
+      fieldName: 'name',
       location: location,
     );
 
@@ -190,16 +192,11 @@ class EntryParser {
       return ParsedEntry(entry: null, errors: fieldErrors);
     }
 
-    final descriptionResult = _reader.readOptionalStringArgument(
-      argumentName: 'description',
-      annotationValue: annotationValue,
+    final descriptionResult = _reader.readOptionalString(
+      constant: constant,
+      fieldName: 'description',
       location: location,
     );
-    final descriptionError = descriptionResult.error;
-
-    if (descriptionError != null) {
-      return ParsedEntry(entry: null, errors: [descriptionError]);
-    }
 
     return ParsedEntry(
       entry: DesignCoverageEntry(

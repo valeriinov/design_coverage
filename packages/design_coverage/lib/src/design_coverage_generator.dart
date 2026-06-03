@@ -15,6 +15,7 @@ class DesignCoverageGenerator {
   static const Set<String> _generatedFileSuffixes = {
     '.freezed.dart',
     '.g.dart',
+    '.gen.dart',
     '.gr.dart',
     '.names.dart',
     '.tailor.dart',
@@ -88,9 +89,8 @@ class DesignCoverageGenerator {
   }) async {
     final entries = <DesignCoverageEntry>[];
     final errors = <String>[];
-    final rootPath = path.normalize(projectRoot.absolute.path);
     final analysisContextCollection = AnalysisContextCollection(
-      includedPaths: [rootPath],
+      includedPaths: [projectRoot.resolveSymbolicLinksSync()],
     );
 
     try {

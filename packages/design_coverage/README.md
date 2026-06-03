@@ -12,7 +12,7 @@ dev_dependencies:
     git:
       url: https://github.com/valeriinov/design_coverage.git
       path: packages/design_coverage
-      ref: 0.1.1
+      ref: 0.2.1
 ```
 
 Add `design_coverage_annotation` to `dependencies`:

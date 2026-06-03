@@ -1,16 +1,38 @@
 import 'package:analyzer/dart/constant/value.dart';
 
-/// Extracts typed argument values from `@DesignComponent` annotation values.
+/// Extracts typed field values from a resolved `@DesignComponent` constant.
 class AnnotationReader {
   const AnnotationReader();
 
-  ReadResult<String> readRequiredDesignUrl({
-    required DartObject annotationValue,
+  ReadResult<String> readRequiredString({
+    required DartObject constant,
+    required String fieldName,
     required String location,
   }) {
-    final strResult = readRequiredStringArgument(
-      argumentName: 'designUrl',
-      annotationValue: annotationValue,
+    final optResult = readOptionalString(
+      constant: constant,
+      fieldName: fieldName,
+      location: location,
+    );
+
+    final value = optResult.value;
+
+    if (value != null) {
+      return ReadResult(value: value);
+    }
+
+    return ReadResult(
+      error: '$location: `$fieldName` must be a non-empty string.',
+    );
+  }
+
+  ReadResult<String> readRequiredDesignUrl({
+    required DartObject constant,
+    required String location,
+  }) {
+    final strResult = readRequiredString(
+      constant: constant,
+      fieldName: 'designUrl',
       location: location,
     );
 
@@ -32,54 +54,20 @@ class AnnotationReader {
     );
   }
 
-  ReadResult<String> readRequiredStringArgument({
-    required String argumentName,
-    required DartObject annotationValue,
+  ReadResult<String> readOptionalString({
+    required DartObject constant,
+    required String fieldName,
     required String location,
   }) {
-    final optResult = readOptionalStringArgument(
-      argumentName: argumentName,
-      annotationValue: annotationValue,
-      location: location,
-    );
+    final field = constant.getField(fieldName);
 
-    final value = optResult.value;
-
-    if (value != null) {
-      return ReadResult(value: value);
-    }
-
-    final error = optResult.error;
-
-    if (error != null) {
-      return ReadResult(error: error);
-    }
-
-    return ReadResult(
-      error: '$location: `$argumentName` must be a non-empty string.',
-    );
-  }
-
-  ReadResult<String> readOptionalStringArgument({
-    required String argumentName,
-    required DartObject annotationValue,
-    required String location,
-  }) {
-    final fieldValue = annotationValue.getField(argumentName);
-
-    if (fieldValue == null || fieldValue.isNull) {
+    if (field == null || field.isNull) {
       return const ReadResult();
     }
 
-    final value = fieldValue.toStringValue()?.trim();
+    final value = field.toStringValue()?.trim();
 
-    if (value == null) {
-      return ReadResult(
-        error: '$location: `$argumentName` must resolve to a string.',
-      );
-    }
-
-    if (value.isEmpty) {
+    if (value == null || value.isEmpty) {
       return const ReadResult();
     }
 
