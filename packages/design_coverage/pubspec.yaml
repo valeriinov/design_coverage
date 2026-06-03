@@ -8,7 +8,7 @@ environment:
   sdk: ^3.11.1
 
 dependencies:
-  analyzer: ^8.4.0
+  analyzer: ^10.0.0
   path: ^1.9.1
   design_coverage_annotation:
     git:

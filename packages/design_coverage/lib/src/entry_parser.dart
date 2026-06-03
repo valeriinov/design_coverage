@@ -114,12 +114,16 @@ class EntryParser {
     required String sourcePath,
     required LineInfo lineInfo,
   }) {
+    // analyzer 10.2 deprecates the `name` token in favour of `namePart`, but
+    // `namePart` is absent in earlier 10.x; keep the token for 10.x compatibility.
+    // ignore: deprecated_member_use
+    final nameToken = declaration.name;
     final location = _buildLocation(
       sourcePath: sourcePath,
       lineInfo: lineInfo,
-      offset: declaration.name.offset,
+      offset: nameToken.offset,
     );
-    final className = declaration.name.lexeme;
+    final className = nameToken.lexeme;
 
     if (_isPrivateClass(className)) {
       return ParsedEntry(
