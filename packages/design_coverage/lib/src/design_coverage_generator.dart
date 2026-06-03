@@ -89,23 +89,26 @@ class DesignCoverageGenerator {
   }) async {
     final entries = <DesignCoverageEntry>[];
     final errors = <String>[];
-
-    final collection = AnalysisContextCollection(
+    final analysisContextCollection = AnalysisContextCollection(
       includedPaths: [projectRoot.resolveSymbolicLinksSync()],
     );
 
-    for (final file in _findSourceFiles(
-      projectRoot,
-      sourceDirectoryPath: sourceDirectoryPath,
-    )) {
-      final result = await _parser.collectFileEntries(
-        file: file,
-        projectRoot: projectRoot,
-        collection: collection,
-      );
+    try {
+      for (final file in _findSourceFiles(
+        projectRoot,
+        sourceDirectoryPath: sourceDirectoryPath,
+      )) {
+        final result = await _parser.collectFileEntries(
+          file: file,
+          projectRoot: projectRoot,
+          analysisContextCollection: analysisContextCollection,
+        );
 
-      entries.addAll(result.entries);
-      errors.addAll(result.errors);
+        entries.addAll(result.entries);
+        errors.addAll(result.errors);
+      }
+    } finally {
+      await analysisContextCollection.dispose();
     }
 
     if (errors.isNotEmpty) {

@@ -11,6 +11,8 @@ import 'package:path/path.dart' as path;
 /// Scans Dart source files and extracts [DesignCoverageEntry] objects
 /// from classes annotated with `@DesignComponent`.
 class EntryParser {
+  static const String _annotationName = 'DesignComponent';
+
   static const Set<String> _supportedWidgetBaseTypes = {
     'StatelessWidget',
     'StatefulWidget',
@@ -25,45 +27,64 @@ class EntryParser {
   Future<FileScanResult> collectFileEntries({
     required File file,
     required Directory projectRoot,
-    required AnalysisContextCollection collection,
+    required AnalysisContextCollection analysisContextCollection,
   }) async {
+    if (!_mayContainAnnotation(file)) {
+      return FileScanResult(entries: [], errors: []);
+    }
+
     final canonicalFilePath = file.resolveSymbolicLinksSync();
     final sourcePath = path.relative(
       canonicalFilePath,
       from: projectRoot.resolveSymbolicLinksSync(),
     );
+    final result = await analysisContextCollection
+        .contextFor(canonicalFilePath)
+        .currentSession
+        .getResolvedUnit(canonicalFilePath);
 
-    final session = collection.contextFor(canonicalFilePath).currentSession;
-    final result = await session.getResolvedUnit(canonicalFilePath);
-
-    if (result is! ResolvedUnitResult) {
+    if (result is! ResolvedUnitResult || !result.exists) {
       return FileScanResult(
         entries: [],
-        errors: ['$sourcePath: failed to resolve file.'],
+        errors: ['$sourcePath: Could not resolve Dart source file.'],
       );
     }
 
+    return _collectResolvedUnitEntries(
+      sourcePath: sourcePath,
+      resolvedUnitResult: result,
+    );
+  }
+
+  bool _mayContainAnnotation(File file) {
+    return file.readAsStringSync().contains(_annotationName);
+  }
+
+  FileScanResult _collectResolvedUnitEntries({
+    required String sourcePath,
+    required ResolvedUnitResult resolvedUnitResult,
+  }) {
     final entries = <DesignCoverageEntry>[];
     final errors = <String>[];
 
     for (final declaration
-        in result.unit.declarations.whereType<ClassDeclaration>()) {
+        in resolvedUnitResult.unit.declarations.whereType<ClassDeclaration>()) {
       final annotation = _findDesignComponentAnnotation(declaration.metadata);
 
       if (annotation == null) {
         continue;
       }
 
-      final entryResult = _parseEntry(
+      final result = _parseEntry(
         annotation: annotation,
         declaration: declaration,
         sourcePath: sourcePath,
-        lineInfo: result.lineInfo,
+        lineInfo: resolvedUnitResult.lineInfo,
       );
 
-      errors.addAll(entryResult.errors);
+      errors.addAll(result.errors);
 
-      final entry = entryResult.entry;
+      final entry = result.entry;
 
       if (entry != null) {
         entries.add(entry);
@@ -79,7 +100,7 @@ class EntryParser {
         annotation.name.toSource(),
       );
 
-      if (annotationName == 'DesignComponent') {
+      if (annotationName == _annotationName) {
         return annotation;
       }
     }
@@ -135,9 +156,7 @@ class EntryParser {
     if (constant == null) {
       return ParsedEntry(
         entry: null,
-        errors: [
-          '$location: `@DesignComponent` could not be evaluated as a constant.',
-        ],
+        errors: ['$location: `@DesignComponent` must be a valid constant.'],
       );
     }
 

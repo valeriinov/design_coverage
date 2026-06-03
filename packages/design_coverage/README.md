@@ -12,7 +12,7 @@ dev_dependencies:
     git:
       url: https://github.com/valeriinov/design_coverage.git
       path: packages/design_coverage
-      ref: 0.2.0
+      ref: 0.2.1
 ```
 
 Add `design_coverage_annotation` to `dependencies`:
@@ -23,7 +23,7 @@ dependencies:
     git:
       url: https://github.com/valeriinov/design_coverage.git
       path: packages/design_coverage_annotation
-      ref: 0.2.0
+      ref: 0.2.1
 ```
 
 ## Usage
@@ -46,6 +46,10 @@ class PrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) => const SizedBox();
 }
 ```
+
+Argument values are resolved as constants, so you can reference shared `const`
+strings (for example `category: DesignCategories.buttons`) instead of inline
+string literals.
 
 ### 2. Generate the report
 
