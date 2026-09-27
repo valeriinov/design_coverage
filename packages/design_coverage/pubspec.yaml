@@ -2,19 +2,19 @@ name: design_coverage
 description: Generator package for design coverage markdown output.
 publish_to: none
 
-version: 0.2.1
+version: 0.2.2
 
 environment:
   sdk: ^3.11.1
 
 dependencies:
-  analyzer: ^10.0.0
+  analyzer: ">=10.2.0 <14.0.0"
   path: ^1.9.1
   design_coverage_annotation:
     git:
       url: https://github.com/valeriinov/design_coverage.git
       path: packages/design_coverage_annotation
-      ref: 0.2.1
+      ref: 0.2.2
 
 dev_dependencies:
   test: ^1.25.15
